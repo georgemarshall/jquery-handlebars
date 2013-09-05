@@ -1,7 +1,6 @@
-(function ($) {
+(function($, Handlebars, undefined) {
 	'use strict';
-
-	var cache = {};
+	var templates = Handlebars.templates = Handlebars.templates || {};
 
 	var defaultSettings = {
 		templatePath: '',
@@ -14,11 +13,11 @@
 
 	function resolvePath(basePath, name, extension) {
 		basePath = basePath.replace(/[(^\s)(\s$)]/g, '');
-		if (basePath.length) {
-			return basePath + '/' + name + '.' + extension;
-		} else {
-			return name + '.' + extension;
+		if (!!basePath) {
+			basePath += '/';
 		}
+		basePath += name + '.' + extension;
+		return basePath;
 	}
 
 	function resolveTemplatePath(name) {
@@ -36,7 +35,7 @@
 		}, 'text');
 	}
 
-	$.handlebars = function () {
+	$.handlebars = function() {
 		if (typeof arguments[0] !== 'string') {
 			var options = arguments[0];
 			if (options.hasOwnProperty('partials')) {
@@ -71,17 +70,31 @@
 		}
 	};
 
-	$.fn.render = function (templateName, data) {
-		var url = resolveTemplatePath(templateName);
-		if (cache.hasOwnProperty(url)) {
-			this.html(cache[url](data)).trigger('render.handlebars', [templateName, data]);
+	$.fn.render = function(options) {
+		options = $.extend({}, options, this.data());
+		console.log(options);
+
+		// check for template exsistance or load it
+		if (options.template === undefined) {
+			return; // Template is undefined
+		}
+		if (!templates || !templates[options.template]) {
+			// TODO: Add support for runtime only environment
+			var self = this;
+
+			// Attempt to fetch the template and compile it into handlebars
+			$.ajax({
+				dataType: 'text',
+				success: function(template) {
+					var template = templates[options.template] = Handlebars.compile(template);
+					self.html(template(options.data)).trigger('render.handlebars', options);
+				},
+				url: resolveTemplatePath(options.template)
+			});
 		} else {
-			var $this = this;
-			$.get(url, function (template) {
-				cache[url] = Handlebars.compile(template);
-				$this.html(cache[url](data)).trigger('render.handlebars', [templateName, data]);
-			}, 'text');
+			var template = templates[options.template];
+			this.html(template(options.data)).trigger('render.handlebars', options);
 		}
 		return this;
 	};
-}(jQuery));
+})(jQuery, Handlebars);
