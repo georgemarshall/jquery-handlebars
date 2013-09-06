@@ -1,15 +1,18 @@
 (function($, Handlebars, undefined) {
 	'use strict';
-	var templates = Handlebars.templates = Handlebars.templates || {};
-
 	var defaultSettings = {
-		templatePath: '',
-		templateExtension: 'handlebars',
+		partialExtension: 'partial',
 		partialPath: '',
-		partialExtension: 'partial'
-	};
+		src: '',
+		template: '',
+		templateExtension: 'handlebars',
+		templatePath: ''
+	},
+		settings = $.extend({}, defaultSettings),
+		sources = {},
+		sourcesCache = {},
+		templates = Handlebars.templates = Handlebars.templates || {};
 
-	var settings = $.extend({}, defaultSettings);
 
 	function resolvePath(basePath, name, extension) {
 		basePath = basePath.replace(/[(^\s)(\s$)]/g, '');
@@ -33,6 +36,46 @@
 			Handlebars.registerPartial(name, partial);
 			callback();
 		}, 'text');
+	}
+
+	function loadData(name) {
+		if (name === undefined) {
+			return new jQuery.Deferred().reject();
+		}
+
+		if (!sourcesCache[name]) {
+			if (!sources[name]) {
+				sourcesCache[name] = $.ajax({url: name});
+			} else {
+				sourcesCache[name] = sources[name]();
+			}
+		}
+
+		return sourcesCache[name];
+	}
+
+	function loadTemplate(name) {
+		var deferred = new jQuery.Deferred();
+		if (name === undefined) {
+			return deferred.reject();
+		}
+
+		if (!!templates[name]) {
+			deferred.resolveWith({name: name}, [templates[name]]);
+		} else {
+			// Attempt to fetch the template and compile it into handlebars
+			var load = $.ajax({
+				dataType: 'text',
+				url: resolveTemplatePath(name)
+			}).then(function(source) {
+				templates[name] = Handlebars.compile(source);
+				deferred.resolveWith({name: name}, [templates[name]]);
+			}, function() {
+				deferred.rejectWith({name: name});
+			});
+		}
+
+		return deferred;
 	}
 
 	$.handlebars = function() {
@@ -71,30 +114,14 @@
 	};
 
 	$.fn.render = function(options) {
-		options = $.extend({}, options, this.data());
-		console.log(options);
+		var self = this;
+		options = $.extend({}, settings, options, this.data());
 
-		// check for template exsistance or load it
-		if (options.template === undefined) {
-			return; // Template is undefined
-		}
-		if (!templates || !templates[options.template]) {
-			// TODO: Add support for runtime only environment
-			var self = this;
+		// Load our data and template async
+		$.when(loadData(options.src), loadTemplate(options.template)).done(function(data, template) {
+			self.html(template(data[0])).trigger('render.handlebars', options);
+		});
 
-			// Attempt to fetch the template and compile it into handlebars
-			$.ajax({
-				dataType: 'text',
-				success: function(template) {
-					var template = templates[options.template] = Handlebars.compile(template);
-					self.html(template(options.data)).trigger('render.handlebars', options);
-				},
-				url: resolveTemplatePath(options.template)
-			});
-		} else {
-			var template = templates[options.template];
-			this.html(template(options.data)).trigger('render.handlebars', options);
-		}
 		return this;
 	};
 })(jQuery, Handlebars);
