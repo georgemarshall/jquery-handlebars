@@ -38,6 +38,17 @@
 		}, 'text');
 	}
 
+	function registerSource(name, obj) {
+		if (typeof obj === 'object') {
+			obj = function() {
+				var deferred = new jQuery.Deferred();
+				deferred.resolve([obj]);
+				return deferred;
+			};
+		}
+		sources[name] = obj;
+	}
+
 	function loadData(name) {
 		if (name === undefined) {
 			return new jQuery.Deferred().reject();
@@ -97,6 +108,9 @@
 			settings.partialPath = settings.partialPath.replace(/\\\/$/, '');
 		} else {
 			switch (arguments[0]) {
+			case 'helper':
+				Handlebars.registerHelper(arguments[1], arguments[2]);
+				break;
 			case 'partial':
 				if (arguments.length < 3) {
 					registerPartial(arguments[1], arguments[1]);
@@ -104,8 +118,8 @@
 					registerPartial(arguments[1], arguments[2]);
 				}
 				break;
-			case 'helper':
-				Handlebars.registerHelper(arguments[1], arguments[2]);
+			case 'source':
+				registerSource(arguments[1], arguments[2]);
 				break;
 			default:
 				throw 'invalid action specified to jQuery.handlebars: ' + arguments[0];
@@ -114,12 +128,16 @@
 	};
 
 	$.fn.render = function(options) {
-		var self = this;
-		options = $.extend({}, settings, options, this.data());
+		options = $.extend({}, settings, options);
 
-		// Load our data and template async
-		$.when(loadData(options.src), loadTemplate(options.template)).done(function(data, template) {
-			self.html(template(data[0])).trigger('render.handlebars', options);
+		// Load our data and templates async
+		this.each(function() {
+			var self = $(this),
+				lcaolOptions = $.extend({}, options, self.data());
+
+			$.when(loadData(lcaolOptions.src), loadTemplate(lcaolOptions.template)).done(function(data, template) {
+				self.html(template(data[0])).trigger('render.handlebars', lcaolOptions);
+			});
 		});
 
 		return this;
