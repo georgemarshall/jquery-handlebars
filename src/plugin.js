@@ -150,10 +150,32 @@
 		// Load our data and templates async
 		this.each(function() {
 			var self = $(this),
-				lcaolOptions = $.extend({}, options, self.data());
+				localOptions = $.extend({}, options, self.data());
 
-			$.when(loadData(lcaolOptions.src), loadTemplate(lcaolOptions.template)).done(function(data, template) {
-				self.html(template(data[0])).trigger('render.handlebars', lcaolOptions);
+			$.when(loadData(localOptions.src), loadTemplate(localOptions.template)).done(function(response, template) {
+				var data = response[0];
+
+				if (!!localOptions.context) {
+					var paths = localOptions.context.split(' ');
+					data = {};
+
+					for (var i = 0; i < paths.length; i++) {
+						var path = paths[i].split('.'),
+							pointer = response[0];
+
+						for (var j = 0; j < path.length; j++) {
+							pointer = pointer[path[j]];
+
+							if (pointer === undefined) {
+								return;
+							} else if (j === (path.length - 1)) {
+								data[path[j]] = pointer;
+							}
+						};
+					};
+				}
+
+				self.html(template(data)).trigger('render.handlebars', localOptions);
 			});
 		});
 
