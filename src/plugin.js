@@ -73,9 +73,9 @@
 
 		if (!!templates[name]) {
 			deferred.resolveWith({name: name}, [templates[name]]);
-		} else {
+		} else if (!!Handlebars.compile) {
 			// Attempt to fetch the template and compile it into handlebars
-			var load = $.ajax({
+			$.ajax({
 				dataType: 'text',
 				url: resolveTemplatePath(name)
 			}).then(function(source) {
@@ -84,6 +84,8 @@
 			}, function() {
 				deferred.rejectWith({name: name});
 			});
+		} else {
+			deferred.rejectWith({name: name});
 		}
 
 		return deferred;
