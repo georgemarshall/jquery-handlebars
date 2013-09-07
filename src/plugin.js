@@ -31,11 +31,8 @@
 		return resolvePath(settings.partialPath, name, settings.partialExtension);
 	}
 
-	function registerPartial(path, name, callback) {
-		$.get(resolvePartialPath(path), function (partial) {
-			Handlebars.registerPartial(name, partial);
-			callback();
-		}, 'text');
+	function registerPartial(name) {
+		return loadPartial(name);
 	}
 
 	function registerSource(name, obj) {
@@ -65,6 +62,29 @@
 		return sourcesCache[name];
 	}
 
+	function loadPartial(name) {
+		var deferred = new jQuery.Deferred();
+		if (name === undefined) {
+			return deferred.reject();
+		}
+
+		if (!!Handlebars.partials[name]) {
+			deferred.resolveWith({name: name}, [Handlebars.partials[name]]);
+		} else {
+			// Attempt to fetch the template and compile it into handlebars
+			$.ajax(resolvePartialPath(name), {
+				dataType: 'text'
+			}).then(function(source) {
+				Handlebars.partials[name] = source;
+				deferred.resolveWith({name: name}, [Handlebars.partials[name]]);
+			}, function() {
+				deferred.rejectWith({name: name});
+			});
+		}
+
+		return deferred;
+	}
+
 	function loadTemplate(name) {
 		var deferred = new jQuery.Deferred();
 		if (name === undefined) {
@@ -75,9 +95,8 @@
 			deferred.resolveWith({name: name}, [templates[name]]);
 		} else if (!!Handlebars.compile) {
 			// Attempt to fetch the template and compile it into handlebars
-			$.ajax({
-				dataType: 'text',
-				url: resolveTemplatePath(name)
+			$.ajax(resolveTemplatePath(name), {
+				dataType: 'text'
 			}).then(function(source) {
 				templates[name] = Handlebars.compile(source);
 				deferred.resolveWith({name: name}, [templates[name]]);
@@ -101,9 +120,9 @@
 				} else {
 					names = options.partials.split(/\s+/g);
 				}
-				for (var i = 0; i < names.length; i++) {
-					registerPartial(names[i], names[i]);
-				}
+				for (var i = names.length - 1; i >= 0; i--) {
+					registerPartial(names[i])
+				};
 			}
 			settings = $.extend(defaultSettings, arguments[0]);
 			settings.templatePath = settings.templatePath.replace(/\\\/$/, '');
@@ -114,11 +133,7 @@
 				Handlebars.registerHelper(arguments[1], arguments[2]);
 				break;
 			case 'partial':
-				if (arguments.length < 3) {
-					registerPartial(arguments[1], arguments[1]);
-				} else {
-					registerPartial(arguments[1], arguments[2]);
-				}
+				registerPartial(arguments[1]);
 				break;
 			case 'source':
 				registerSource(arguments[1], arguments[2]);
