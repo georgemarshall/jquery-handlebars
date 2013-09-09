@@ -137,6 +137,9 @@
 			settings.partialPath = settings.partialPath.replace(/\\\/$/, '');
 		} else {
 			switch (arguments[0]) {
+			case 'binding':
+				registerBinding(arguments[1], arguments[2]);
+				break;
 			case 'helper':
 				Handlebars.registerHelper(arguments[1], arguments[2]);
 				break;
