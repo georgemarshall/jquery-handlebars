@@ -1,13 +1,14 @@
 (function($, Handlebars, undefined) {
 	'use strict';
-	var defaultSettings = {
-		partialExtension: 'partial',
-		partialPath: '',
-		src: '',
-		template: '',
-		templateExtension: 'handlebars',
-		templatePath: ''
-	},
+	var bindings = {},
+		defaultSettings = {
+			partialExtension: 'partial',
+			partialPath: '',
+			src: '',
+			template: '',
+			templateExtension: 'handlebars',
+			templatePath: ''
+		},
 		settings = $.extend({}, defaultSettings),
 		sources = {},
 		sourcesCache = {},
@@ -29,6 +30,13 @@
 
 	function resolvePartialPath(name) {
 		return resolvePath(settings.partialPath, name, settings.partialExtension);
+	}
+
+	function registerBinding(name, obj) {
+		if (typeof obj !== 'object') {
+			return;
+		}
+		bindings[name] = obj;
 	}
 
 	function registerPartial(name) {
@@ -167,7 +175,7 @@
 							pointer = pointer[path[j]];
 
 							if (pointer === undefined) {
-								return;
+								throw new jQuery.error('The path "' + paths[i] + '" could not be found in the datasource.');
 							} else if (j === (path.length - 1)) {
 								data[path[j]] = pointer;
 							}
@@ -175,7 +183,16 @@
 					};
 				}
 
+				var binding = localOptions.binding || localOptions.template;
+				if (!!bindings[binding] && !!bindings[binding].destroy) {
+					bindings[binding].destroy.call(self);
+				}
+
 				self.html(template(data)).trigger('render.handlebars', localOptions);
+
+				if (!!bindings[binding] && !!bindings[binding].render) {
+					bindings[binding].render.call(self);
+				}
 			});
 		});
 
